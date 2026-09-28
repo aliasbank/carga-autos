@@ -10,6 +10,8 @@ export const profiles = sqliteTable("profiles", {
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   canManageChargers: integer("can_manage_chargers", { mode: "boolean" }).notNull().default(false),
   notificationChannel: text("notification_channel", { enum: ["app", "email"] }).notNull().default("app"),
+  vehicleMake: text("vehicle_make"),
+  vehicleColor: text("vehicle_color"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

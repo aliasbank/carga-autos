@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       const count = await getDatabase().prepare("SELECT COUNT(*) AS total FROM accounts").first<{ total: number }>();
       if ((count?.total ?? 0) !== 0) return Response.json({ error: "La configuración inicial ya fue completada." }, { status: 409 });
       const account = await createLocalAccount({
-        username: String(payload.username || ""), password: String(payload.password || ""), alias: String(payload.alias || ""), phone: String(payload.phone || ""),
+        username: String(payload.username || ""), password: String(payload.password || ""),
         role: "administrador", canManageChargers: true,
       });
       const cookie = await createSession(account.accountId, request);
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       // Public registration always creates the least-privileged account.
       // Role and charger-management permissions are assigned only by an admin.
       const account = await createLocalAccount({
-        username: String(payload.username || ""), password: String(payload.password || ""), alias: String(payload.alias || ""), phone: String(payload.phone || ""),
+        username: String(payload.username || ""), password: String(payload.password || ""),
         role: "usuario", canManageChargers: false,
       });
       const cookie = await createSession(account.accountId, request);

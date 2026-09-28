@@ -8,12 +8,13 @@ export type Role = "usuario" | "coordinador" | "administrador";
 export type Principal = {
   accountId: number;
   profileId: number;
-  alias: string;
-  phone: string;
+  username: string;
   role: Role;
   isActive: boolean;
   canManageChargers: boolean;
   notificationChannel: "app" | "email";
+  vehicleMake: string;
+  vehicleColor: string;
 };
 
 export class AuthError extends Error {
@@ -70,8 +71,8 @@ export async function currentUser(request: Request): Promise<Principal | null> {
   if (!token) return null;
   const database = getDatabase();
   const result = await database.prepare(`
-    SELECT a.id AS account_id, p.id AS profile_id, p.alias, p.phone, p.role, p.is_active,
-      p.can_manage_chargers, p.notification_channel
+    SELECT a.id AS account_id, a.username, p.id AS profile_id, p.role, p.is_active,
+      p.can_manage_chargers, p.notification_channel, p.vehicle_make, p.vehicle_color
     FROM sessions s
     JOIN accounts a ON a.id = s.account_id
     JOIN profiles p ON p.id = a.profile_id
@@ -79,8 +80,9 @@ export async function currentUser(request: Request): Promise<Principal | null> {
   `).bind(await digest(token), new Date().toISOString()).first<Record<string, unknown>>();
   if (!result || Number(result.is_active) !== 1) return null;
   return {
-    accountId: Number(result.account_id), profileId: Number(result.profile_id), alias: String(result.alias), phone: String(result.phone), role: result.role as Role,
+    accountId: Number(result.account_id), profileId: Number(result.profile_id), username: String(result.username), role: result.role as Role,
     isActive: true, canManageChargers: Number(result.can_manage_chargers) === 1, notificationChannel: result.notification_channel as "app" | "email",
+    vehicleMake: String(result.vehicle_make || ""), vehicleColor: String(result.vehicle_color || ""),
   };
 }
 
@@ -99,17 +101,16 @@ export function isAdmin(user: Principal) { return user.role === "administrador";
 export type NewAccount = {
   username: string;
   password: string;
-  alias: string;
-  phone: string;
   role: Role;
   canManageChargers?: boolean;
 };
 
 export async function createLocalAccount(input: NewAccount) {
   const username = validateCredentials(input.username, input.password);
-  const alias = input.alias.trim().slice(0, 30);
-  const phone = input.phone.trim().slice(0, 24);
-  if (!alias || !phone) throw new AuthError("Indica alias y teléfono.", 400);
+  // These compatibility fields remain in the database for a future bot integration.
+  // The username is now the sole visible identity in the application.
+  const alias = username;
+  const phone = "";
   const salt = randomHex(16);
   const database = getDatabase();
   const profileResult = await database.prepare(`

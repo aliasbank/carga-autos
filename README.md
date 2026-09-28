@@ -1,3 +1,11 @@
+# Carga en orden
+
+## Despliegue en Ubuntu con Docker
+
+La aplicación incluye un contenedor con volumen persistente para la base de datos local. Consulta [DEPLOY-UBUNTU.md](DEPLOY-UBUNTU.md) para instalarla, actualizarla y respaldar los datos.
+
+---
+
 # vinext-starter
 
 A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.

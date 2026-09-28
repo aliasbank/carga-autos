@@ -1,0 +1,74 @@
+name: carga-en-orden
+
+services:
+  init-data:
+    image: carga-en-orden:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec", "mkdir -p /data && chown -R node:node /data"]
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    volumes:
+      - carga_en_orden_data:/data
+
+  cargadores:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: carga-en-orden:local
+    restart: unless-stopped
+    init: true
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8787}:8787"
+    environment:
+      TZ: America/Mexico_City
+      PORT: 8787
+      HOST: 0.0.0.0
+      APP_DATA_DIR: /data
+      SITES_RUNTIME_ROOT: /data/runtime
+      QUEUE_AUTOMATION_TOKEN: ${QUEUE_AUTOMATION_TOKEN:?Define QUEUE_AUTOMATION_TOKEN en el archivo .env}
+    volumes:
+      - carga_en_orden_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  queue-automation:
+    image: carga-en-orden:local
+    restart: unless-stopped
+    init: true
+    depends_on:
+      cargadores:
+        condition: service_healthy
+    entrypoint: ["node", "scripts/queue-scheduler.mjs"]
+    environment:
+      QUEUE_AUTOMATION_URL: http://cargadores:8787/api/queue-automation
+      QUEUE_AUTOMATION_TOKEN: ${QUEUE_AUTOMATION_TOKEN:?Define QUEUE_AUTOMATION_TOKEN en el archivo .env}
+      QUEUE_AUTOMATION_INTERVAL_SECONDS: 30
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  carga_en_orden_data:

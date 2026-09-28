@@ -1,75 +1,37 @@
 import { AuthError, canManageChargers, createLocalAccount, isAdmin, requireUser, resetPassword, type Role } from "@/lib/auth";
+import { rebalanceQueue, requeueNoShows } from "@/lib/charging-queue";
 import { getDatabase } from "@/lib/database";
 
-type Channel = "app" | "email";
 type ChargerAccess = "usuario" | "coordinador";
-const HANDOVER_MINUTES = 5;
 
 function error(message: string, status = 400) { return Response.json({ error: message }, { status }); }
-function isoPlusMinutes(iso: string, minutes: number) { return new Date(new Date(iso).getTime() + minutes * 60_000).toISOString(); }
 function validRole(value: unknown): value is Role { return value === "usuario" || value === "coordinador" || value === "administrador"; }
-
-type QueueEntry = { id: number; status: "queued" | "active"; scheduled_start: string; started_at: string | null; duration_minutes: number };
-
-function laterOf(first: string, second: string) {
-  return new Date(first).getTime() >= new Date(second).getTime() ? first : second;
-}
-
-/** Keeps every pending turn in a charger in a contiguous 120-minute charge + handover sequence. */
-async function rebalanceQueue(database: D1Database, chargerId: number) {
-  const entries = await database.prepare(`
-    SELECT id, status, scheduled_start, started_at, duration_minutes
-    FROM charging_queue
-    WHERE charger_id = ? AND status IN ('queued', 'active')
-    ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, scheduled_start ASC, id ASC
-  `).bind(chargerId).all<QueueEntry>();
-
-  const lastCompleted = await database.prepare(`
-    SELECT ended_at FROM charging_queue
-    WHERE charger_id = ? AND status = 'completed' AND ended_at IS NOT NULL
-    ORDER BY ended_at DESC LIMIT 1
-  `).bind(chargerId).first<{ ended_at: string }>();
-
-  let nextAvailable = new Date().toISOString();
-  if (lastCompleted?.ended_at) nextAvailable = laterOf(nextAvailable, isoPlusMinutes(lastCompleted.ended_at, HANDOVER_MINUTES));
-  for (const entry of entries.results) {
-    if (entry.status === "active") {
-      const start = entry.started_at || entry.scheduled_start;
-      nextAvailable = laterOf(nextAvailable, isoPlusMinutes(start, entry.duration_minutes + HANDOVER_MINUTES));
-      continue;
-    }
-
-    // Pending turns are a queue, not fixed calendar appointments: when one is
-    // cancelled or finishes early, everyone behind it advances immediately.
-    const scheduledStart = nextAvailable;
-    if (scheduledStart !== entry.scheduled_start) {
-      await database.prepare("UPDATE charging_queue SET scheduled_start = ? WHERE id = ?").bind(scheduledStart, entry.id).run();
-    }
-    nextAvailable = isoPlusMinutes(scheduledStart, entry.duration_minutes + HANDOVER_MINUTES);
-  }
-  return nextAvailable;
-}
 
 async function dashboard(request: Request) {
   const database = getDatabase();
   const profile = await requireUser(request);
+  await requeueNoShows(database);
   const chargers = await database.prepare(`
     SELECT c.id, c.code, c.location, c.access_level, c.active,
-      q.id AS queue_id, q.profile_id, q.scheduled_start, q.started_at, q.ended_at, q.duration_minutes, q.status, p.alias AS occupant_alias
+      q.id AS queue_id, q.profile_id, q.scheduled_start, q.started_at, q.ended_at, q.duration_minutes, q.status, a.username AS occupant_username
     FROM chargers c LEFT JOIN charging_queue q ON q.id = (
       SELECT id FROM charging_queue q2 WHERE q2.charger_id = c.id AND q2.status IN ('active','queued')
       ORDER BY CASE q2.status WHEN 'active' THEN 0 ELSE 1 END, q2.scheduled_start ASC LIMIT 1
-    ) LEFT JOIN profiles p ON p.id = q.profile_id WHERE c.active = 1 ORDER BY c.location, c.code
+    ) LEFT JOIN profiles p ON p.id = q.profile_id
+      LEFT JOIN accounts a ON a.profile_id = p.id
+    WHERE c.active = 1 ORDER BY c.location, c.code
   `).all();
   const queue = await database.prepare(`
     SELECT q.id, q.charger_id, q.profile_id, q.scheduled_start, q.started_at, q.ended_at, q.duration_minutes, q.status,
-      c.code AS charger_code, c.location, p.alias
-    FROM charging_queue q JOIN chargers c ON c.id = q.charger_id JOIN profiles p ON p.id = q.profile_id
+      c.code AS charger_code, c.location, a.username
+    FROM charging_queue q JOIN chargers c ON c.id = q.charger_id
+      JOIN profiles p ON p.id = q.profile_id
+      JOIN accounts a ON a.profile_id = p.id
     WHERE q.status IN ('queued','active') ORDER BY q.scheduled_start ASC
   `).all();
   const users = isAdmin(profile) ? await database.prepare(`
-    SELECT p.id, p.alias, p.phone, p.role, p.is_active, p.can_manage_chargers, a.username, a.last_login_at
-    FROM profiles p JOIN accounts a ON a.profile_id = p.id ORDER BY p.role DESC, p.alias ASC
+    SELECT p.id, p.role, p.is_active, p.can_manage_chargers, a.username, a.last_login_at
+    FROM profiles p JOIN accounts a ON a.profile_id = p.id ORDER BY p.role DESC, a.username ASC
   `).all() : { results: [] };
   return Response.json({
     profile: { ...profile, canManageChargers: canManageChargers(profile) }, chargers: chargers.results, queue: queue.results, users: users.results, now: new Date().toISOString(),
@@ -90,13 +52,13 @@ export async function POST(request: Request) {
     const profile = await requireUser(request);
     const database = getDatabase();
     const action = String(payload.action || "");
+    await requeueNoShows(database);
 
     if (action === "profile") {
-      const alias = String(payload.alias || "").trim().slice(0, 30);
-      const phone = String(payload.phone || "").trim().slice(0, 24);
-      const channel: Channel = payload.notificationChannel === "email" ? "email" : "app";
-      if (!alias || !phone) return error("Indica un alias y teléfono para recibir avisos.");
-      await database.prepare("UPDATE profiles SET alias = ?, phone = ?, notification_channel = ? WHERE id = ?").bind(alias, phone, channel, profile.profileId).run();
+      const vehicleMake = String(payload.vehicleMake || "").trim().slice(0, 50);
+      const vehicleColor = String(payload.vehicleColor || "").trim().slice(0, 40);
+      await database.prepare("UPDATE profiles SET vehicle_make = ?, vehicle_color = ? WHERE id = ?")
+        .bind(vehicleMake || null, vehicleColor || null, profile.profileId).run();
       return dashboard(request);
     }
 
@@ -122,7 +84,7 @@ export async function POST(request: Request) {
     if (action === "create-user") {
       if (!isAdmin(profile)) return error("Solo administración puede crear cuentas.", 403);
       const role = validRole(payload.role) ? payload.role : "usuario";
-      await createLocalAccount({ username: String(payload.username || ""), password: String(payload.password || ""), alias: String(payload.alias || ""), phone: String(payload.phone || ""), role, canManageChargers: payload.canManageChargers === true });
+      await createLocalAccount({ username: String(payload.username || ""), password: String(payload.password || ""), role, canManageChargers: payload.canManageChargers === true });
       return dashboard(request);
     }
 
@@ -138,12 +100,9 @@ export async function POST(request: Request) {
         const admins = await database.prepare("SELECT COUNT(*) AS total FROM profiles WHERE role = 'administrador' AND is_active = 1").first<{ total: number }>();
         if ((admins?.total ?? 0) <= 1) return error("Debe conservarse al menos un administrador activo.");
       }
-      const alias = String(payload.alias || "").trim().slice(0, 30);
-      const phone = String(payload.phone || "").trim().slice(0, 24);
-      if (!alias || !phone) return error("Alias y teléfono son obligatorios.");
       const canManage = role === "administrador" || payload.canManageChargers === true ? 1 : 0;
-      await database.prepare("UPDATE profiles SET alias = ?, phone = ?, role = ?, is_active = ?, can_manage_chargers = ? WHERE id = ?")
-        .bind(alias, phone, role, active, canManage, profileId).run();
+      await database.prepare("UPDATE profiles SET role = ?, is_active = ?, can_manage_chargers = ? WHERE id = ?")
+        .bind(role, active, canManage, profileId).run();
       const password = String(payload.password || "");
       if (password) await resetPassword(profileId, password);
       return dashboard(request);
