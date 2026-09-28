@@ -20,7 +20,9 @@ services:
       - carga_en_orden_data:/data
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      # Wrangler creates its short-lived bundles beside its configuration.
+      - /app/dist/server/.wrangler:rw,nosuid,nodev,noexec,size=64m,mode=1777
     cap_drop:
       - ALL
 
@@ -38,7 +40,7 @@ services:
       QUEUE_AUTOMATION_INTERVAL_SECONDS: 30
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     cap_drop:
       - ALL
 

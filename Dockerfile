@@ -29,7 +29,10 @@ COPY --from=build --chown=node:node /app/scripts ./scripts
 
 # Docker copies this directory into a new named volume before the process runs,
 # so the non-root service account can create the D1 state and backup files.
-RUN mkdir -p /data && touch /data/.volume-initialized && chown -R node:node /data
+# The Wrangler path is a mountpoint for an ephemeral tmpfs at runtime.
+RUN mkdir -p /data /app/dist/server/.wrangler \
+    && touch /data/.volume-initialized \
+    && chown -R node:node /data /app/dist/server/.wrangler
 
 USER node
 EXPOSE 8787
