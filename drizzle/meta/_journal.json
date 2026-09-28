@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790605740763,
+      "tag": "0000_left_mesmero",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790605758857,
+      "tag": "0001_chemical_the_hand",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790609792029,
+      "tag": "0002_living_earthquake",
+      "breakpoints": true
+    }
+  ]
+}

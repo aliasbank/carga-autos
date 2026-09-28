@@ -1,0 +1,2 @@
+CREATE INDEX `idx_queue_charger_status_start` ON `charging_queue` (`charger_id`,`status`,`scheduled_start`);--> statement-breakpoint
+CREATE INDEX `idx_queue_profile_status` ON `charging_queue` (`profile_id`,`status`);

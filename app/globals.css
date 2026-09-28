@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../vendor/shadcn-tailwind-4.13.0.css";
+
+:root { --background: #eef5f7; --foreground: #102b3f; --primary: #102b3f; --primary-foreground: #fff; --secondary: #e8f3f0; --secondary-foreground: #102b3f; --muted: #eef5f7; --muted-foreground: #5d7180; --accent: #e8f3f0; --accent-foreground: #102b3f; --destructive: #be375f; --border: #d8e4e8; --input: #c9d9df; --ring: #2e7585; --radius: .75rem; --card: #fff; --card-foreground: #102b3f; --popover: #fff; --popover-foreground: #102b3f; }
+@theme inline { --color-background: var(--background); --color-foreground: var(--foreground); --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground); --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground); --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground); --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground); --color-destructive: var(--destructive); --color-border: var(--border); --color-input: var(--input); --color-ring: var(--ring); --color-card: var(--card); --color-card-foreground: var(--card-foreground); --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground); --radius: var(--radius); --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
