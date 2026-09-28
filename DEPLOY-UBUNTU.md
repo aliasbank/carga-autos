@@ -39,7 +39,7 @@ Esta entrega ejecuta la aplicación como un contenedor y conserva usuarios, carg
 docker compose logs -f cargadores
 ```
 
-El primer arranque ejecuta un contenedor breve que prepara los permisos del volumen; después la aplicación corre con el usuario sin privilegios `node`. La aplicación queda disponible solo en `127.0.0.1:8787` de forma predeterminada. Esto permite colocar Nginx o Caddy al frente para TLS y control de acceso. Para una prueba temporal desde la red interna, cambia `APP_BIND_ADDRESS` a `0.0.0.0` en `.env` y reinicia con `docker compose up -d`.
+Al iniciar, Docker crea el volumen persistente desde la carpeta `/data` de la imagen, que ya pertenece al usuario sin privilegios `node`; no se necesita un contenedor de inicialización con privilegios. La aplicación queda disponible solo en `127.0.0.1:8787` de forma predeterminada. Esto permite colocar Nginx o Caddy al frente para TLS y control de acceso. Para una prueba temporal desde la red interna, cambia `APP_BIND_ADDRESS` a `0.0.0.0` en `.env` y reinicia con `docker compose up -d`.
 
 También se inicia el servicio interno `queue-automation`. No expone puertos y
 revisa la fila cada 30 segundos. Puedes revisar sus registros con:

@@ -1,26 +1,6 @@
 name: carga-en-orden
 
 services:
-  init-data:
-    image: carga-en-orden:local
-    build:
-      context: .
-      dockerfile: Dockerfile
-    user: "0:0"
-    entrypoint: ["/bin/sh", "-ec", "mkdir -p /data && chown -R node:node /data"]
-    restart: "no"
-    read_only: true
-    tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-    volumes:
-      - carga_en_orden_data:/data
-
   cargadores:
     build:
       context: .
@@ -28,9 +8,6 @@ services:
     image: carga-en-orden:local
     restart: unless-stopped
     init: true
-    depends_on:
-      init-data:
-        condition: service_completed_successfully
     ports:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8787}:8787"
     environment:
@@ -52,6 +29,7 @@ services:
 
   queue-automation:
     image: carga-en-orden:local
+    pull_policy: never
     restart: unless-stopped
     init: true
     depends_on:
