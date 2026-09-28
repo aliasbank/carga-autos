@@ -7,7 +7,6 @@ services:
       dockerfile: Dockerfile
     image: carga-en-orden:local
     restart: unless-stopped
-    init: true
     ports:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8787}:8787"
     environment:
@@ -31,7 +30,6 @@ services:
     image: carga-en-orden:local
     pull_policy: never
     restart: unless-stopped
-    init: true
     depends_on:
       cargadores:
         condition: service_healthy

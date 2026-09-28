@@ -36,10 +36,10 @@ Esta entrega ejecuta la aplicación como un contenedor y conserva usuarios, carg
 
    ```bash
    docker compose ps
-docker compose logs -f cargadores
-```
+   docker compose logs -f cargadores
+   ```
 
-Al iniciar, Docker crea el volumen persistente desde la carpeta `/data` de la imagen, que ya pertenece al usuario sin privilegios `node`; no se necesita un contenedor de inicialización con privilegios. La aplicación queda disponible solo en `127.0.0.1:8787` de forma predeterminada. Esto permite colocar Nginx o Caddy al frente para TLS y control de acceso. Para una prueba temporal desde la red interna, cambia `APP_BIND_ADDRESS` a `0.0.0.0` en `.env` y reinicia con `docker compose up -d`.
+Al iniciar, Docker crea el volumen persistente desde la carpeta `/data` de la imagen, que ya pertenece al usuario sin privilegios `node`; no se necesita un contenedor auxiliar ni privilegios adicionales. La aplicación queda disponible solo en `127.0.0.1:8787` de forma predeterminada. Esto permite colocar Nginx o Caddy al frente para TLS y control de acceso. Para una prueba temporal desde la red interna, cambia `APP_BIND_ADDRESS` a `0.0.0.0` en `.env` y reinicia con `docker compose up -d`.
 
 También se inicia el servicio interno `queue-automation`. No expone puertos y
 revisa la fila cada 30 segundos. Puedes revisar sus registros con:
@@ -71,10 +71,19 @@ No uses `docker compose down -v` salvo que desees eliminar definitivamente todos
 Sustituye los archivos del proyecto y ejecuta:
 
 ```bash
+docker compose down --remove-orphans
 docker compose up -d --build
 ```
 
 Las nuevas migraciones se aplicarán una sola vez al iniciar.
+El comando no elimina el volumen de datos porque no usa `-v`.
+
+## Solución de problemas
+
+Si el registro mostraba `exec /sbin/docker-init: operation not permitted`, el
+servidor está bloqueando el proceso auxiliar que Docker solo activa con
+`init: true`. Esta versión ya no usa esa opción. Actualiza los archivos y
+ejecuta los comandos de la sección anterior; no elimines el volumen de datos.
 
 ## Respaldo
 
