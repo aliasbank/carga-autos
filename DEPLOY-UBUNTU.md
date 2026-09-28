@@ -82,8 +82,12 @@ El comando no elimina el volumen de datos porque no usa `-v`.
 
 Si el registro mostraba `exec /sbin/docker-init: operation not permitted`, el
 servidor está bloqueando el proceso auxiliar que Docker solo activa con
-`init: true`. Esta versión ya no usa esa opción. Actualiza los archivos y
-ejecuta los comandos de la sección anterior; no elimines el volumen de datos.
+`init: true`. Esta versión ya no usa esa opción. Si mostraba
+`exec /usr/local/bin/docker-entrypoint.sh: operation not permitted`, el host
+también está bloqueando el *entrypoint* de shell heredado por la imagen de
+Node. Esta versión ejecuta directamente `/usr/local/bin/node`; actualiza los
+archivos y ejecuta los comandos de la sección anterior. No elimines el volumen
+de datos.
 
 ## Respaldo
 

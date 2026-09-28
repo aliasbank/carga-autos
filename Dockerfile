@@ -35,7 +35,12 @@ USER node
 EXPOSE 8787
 VOLUME ["/data"]
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:8787/api/auth').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+# The official Node image defines a shell entrypoint. Override it so this
+# deployment launches the Node binary directly, which also works on hosts that
+# forbid executing image-provided shell entrypoint scripts.
+ENTRYPOINT ["/usr/local/bin/node"]
 
-CMD ["node", "scripts/docker-entrypoint.mjs"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["/usr/local/bin/node", "-e", "fetch('http://127.0.0.1:8787/api/auth').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+
+CMD ["scripts/docker-entrypoint.mjs"]

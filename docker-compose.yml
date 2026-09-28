@@ -33,7 +33,7 @@ services:
     depends_on:
       cargadores:
         condition: service_healthy
-    entrypoint: ["node", "scripts/queue-scheduler.mjs"]
+    entrypoint: ["/usr/local/bin/node", "scripts/queue-scheduler.mjs"]
     environment:
       QUEUE_AUTOMATION_URL: http://cargadores:8787/api/queue-automation
       QUEUE_AUTOMATION_TOKEN: ${QUEUE_AUTOMATION_TOKEN:?Define QUEUE_AUTOMATION_TOKEN en el archivo .env}
