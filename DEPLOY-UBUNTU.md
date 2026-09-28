@@ -42,8 +42,8 @@ Esta entrega ejecuta la aplicación como un contenedor y conserva usuarios, carg
 Al iniciar, Docker crea el volumen persistente desde la carpeta `/data` de la imagen, que ya pertenece al usuario sin privilegios `node`; no se necesita un contenedor auxiliar ni privilegios adicionales. La aplicación queda disponible solo en `127.0.0.1:8787` de forma predeterminada. Esto permite colocar Nginx o Caddy al frente para TLS y control de acceso. Para una prueba temporal desde la red interna, cambia `APP_BIND_ADDRESS` a `0.0.0.0` en `.env` y reinicia con `docker compose up -d`.
 
 El contenedor conserva una raíz de solo lectura. Wrangler usa un `tmpfs` limitado
-y no persistente para sus archivos temporales; estos no se guardan en el
-volumen de la aplicación ni en el host.
+y no persistente para sus archivos temporales, caché y configuración local;
+estos no se guardan en el volumen de la aplicación ni en el host.
 
 También se inicia el servicio interno `queue-automation`. No expone puertos y
 revisa la fila cada 30 segundos. Puedes revisar sus registros con:

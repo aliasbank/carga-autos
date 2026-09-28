@@ -15,6 +15,10 @@ services:
       HOST: 0.0.0.0
       APP_DATA_DIR: /data
       SITES_RUNTIME_ROOT: /data/runtime
+      XDG_CONFIG_HOME: /tmp/.config
+      XDG_CACHE_HOME: /tmp/.cache
+      XDG_DATA_HOME: /tmp/.local/share
+      XDG_STATE_HOME: /tmp/.local/state
       QUEUE_AUTOMATION_TOKEN: ${QUEUE_AUTOMATION_TOKEN:?Define QUEUE_AUTOMATION_TOKEN en el archivo .env}
     volumes:
       - carga_en_orden_data:/data
