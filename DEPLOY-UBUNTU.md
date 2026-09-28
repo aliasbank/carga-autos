@@ -85,9 +85,14 @@ servidor está bloqueando el proceso auxiliar que Docker solo activa con
 `init: true`. Esta versión ya no usa esa opción. Si mostraba
 `exec /usr/local/bin/docker-entrypoint.sh: operation not permitted`, el host
 también está bloqueando el *entrypoint* de shell heredado por la imagen de
-Node. Esta versión ejecuta directamente `/usr/local/bin/node`; actualiza los
-archivos y ejecuta los comandos de la sección anterior. No elimines el volumen
-de datos.
+Node. Esta versión ejecuta directamente `/usr/local/bin/node`.
+
+Algunos hosts también rechazan cualquier proceso al activar
+`no-new-privileges:true`; puedes comprobarlo si `/bin/true` falla con el mismo
+mensaje. En ese caso esta entrega omite únicamente esa opción, pero mantiene la
+ejecución sin root, el sistema de archivos de solo lectura y la eliminación de
+todas las capacidades Linux. Actualiza los archivos y ejecuta los comandos de
+la sección anterior. No elimines el volumen de datos.
 
 ## Respaldo
 
