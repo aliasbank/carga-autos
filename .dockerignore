@@ -1,0 +1,14 @@
+node_modules
+dist
+.next
+.wrangler
+.sites-runtime
+.vinext
+.git
+*.zip
+*.log
+.env
+.env.*
+!.env.docker.example
+data
+backups
