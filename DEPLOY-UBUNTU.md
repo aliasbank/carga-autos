@@ -24,7 +24,14 @@ Esta entrega ejecuta la aplicación como un contenedor y conserva usuarios, carg
 
    Copia el valor generado en `QUEUE_AUTOMATION_TOKEN` dentro de `.env`.
    Este valor debe tener 64 caracteres hexadecimales. Si ya tenías un archivo
-   `.env`, conserva sus valores y agrega únicamente esa variable.
+   `.env`, conserva sus valores y agrega únicamente las variables faltantes.
+
+   Para publicar la aplicación detrás de la ruta
+   `https://appsec.televisaunivision.com/cargadores/`, agrega también:
+
+   ```dotenv
+   APP_BASE_PATH=/cargadores
+   ```
 
 3. Construye e inicia el servicio:
 
@@ -40,6 +47,53 @@ Esta entrega ejecuta la aplicación como un contenedor y conserva usuarios, carg
    ```
 
 Al iniciar, Docker crea el volumen persistente desde la carpeta `/data` de la imagen, que ya pertenece al usuario sin privilegios `node`; no se necesita un contenedor auxiliar ni privilegios adicionales. La aplicación queda disponible solo en `127.0.0.1:8787` de forma predeterminada. Esto permite colocar Nginx o Caddy al frente para TLS y control de acceso. Para una prueba temporal desde la red interna, cambia `APP_BIND_ADDRESS` a `0.0.0.0` en `.env` y reinicia con `docker compose up -d`.
+
+## Publicación dentro de AppSec
+
+Para exponer el MVP bajo `https://appsec.televisaunivision.com/cargadores/`,
+mantén el contenedor y el volumen de datos separados de AppSec. Configura
+`APP_BASE_PATH=/cargadores` antes de construir la imagen. Esa variable se usa
+durante la compilación, en las rutas API, en el chequeo de salud y en la cookie
+de sesión; por ello, siempre reconstruye la imagen después de cambiarla.
+
+Dentro del bloque HTTPS de AppSec agrega las rutas siguientes. No reemplaces
+`location /` ni `location /tools/`:
+
+```nginx
+location = /cargadores {
+    return 302 /cargadores/;
+}
+
+location ^~ /cargadores/ {
+    # Sin barra final: conserva /cargadores/ al enviarlo al contenedor.
+    proxy_pass http://127.0.0.1:8787;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix /cargadores;
+
+    proxy_connect_timeout 30s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+}
+```
+
+Aplica la actualización conservando los datos:
+
+```bash
+docker compose down --remove-orphans
+docker compose up -d --build
+nginx -t
+systemctl reload nginx
+```
+
+No uses `docker compose down -v`; esa variante elimina el volumen con la base
+de datos. Confirma al final que el mapeo del contenedor sea
+`127.0.0.1:8787->8787/tcp` y abre la URL con barra final:
+`https://appsec.televisaunivision.com/cargadores/`.
 
 El contenedor conserva una raíz de solo lectura. Wrangler usa un `tmpfs` limitado
 y no persistente para sus archivos temporales, caché y configuración local;

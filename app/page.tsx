@@ -37,7 +37,7 @@ export default function Home() {
   const notified = useRef(new Set<string>());
 
   const loadDashboard = useCallback(async () => {
-    const response = await fetch("/api/charging", { cache: "no-store" });
+    const response = await fetch("api/charging", { cache: "no-store" });
     const body = await response.json();
     if (response.status === 401) { setData(null); setScreen("login"); throw new Error(""); }
     if (!response.ok) throw new Error(body.error || "No fue posible cargar el tablero.");
@@ -46,7 +46,7 @@ export default function Home() {
 
   const loadAuth = useCallback(async () => {
     try {
-      const response = await fetch("/api/auth", { cache: "no-store" }); const body = await response.json();
+      const response = await fetch("api/auth", { cache: "no-store" }); const body = await response.json();
       if (!response.ok) throw new Error(body.error || "No fue posible revisar el acceso.");
       if (body.user) await loadDashboard(); else setScreen(body.setupRequired ? "setup" : "login");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "No fue posible abrir la aplicación."); setScreen("login"); }
@@ -93,20 +93,20 @@ export default function Home() {
 
   async function send(payload: Record<string, unknown>) {
     setWorking(true); setError("");
-    try { const response = await fetch("/api/charging", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const body = await response.json(); if (!response.ok) throw new Error(body.error || "No se pudo guardar el cambio."); setData(body); setVehicleMake(body.profile.vehicleMake || ""); setVehicleColor(body.profile.vehicleColor || ""); }
+    try { const response = await fetch("api/charging", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const body = await response.json(); if (!response.ok) throw new Error(body.error || "No se pudo guardar el cambio."); setData(body); setVehicleMake(body.profile.vehicleMake || ""); setVehicleColor(body.profile.vehicleColor || ""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Ocurrió un error."); }
     finally { setWorking(false); }
   }
   async function postAuth(payload: Record<string, unknown>) {
     setWorking(true); setError("");
-    try { const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const body = await response.json(); if (!response.ok) throw new Error(body.error || "No se pudo iniciar sesión."); await loadDashboard(); }
+    try { const response = await fetch("api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const body = await response.json(); if (!response.ok) throw new Error(body.error || "No se pudo iniciar sesión."); await loadDashboard(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo iniciar sesión."); }
     finally { setWorking(false); }
   }
   async function handleLogin(event: FormEvent) { event.preventDefault(); await postAuth({ action: "login", username: loginUser, password: loginPassword }); }
   async function handleSetup(event: FormEvent) { event.preventDefault(); if (setup.password !== setup.confirm) return setError("Las contraseñas no coinciden."); await postAuth({ action: "bootstrap", ...setup }); }
   async function handleRegister(event: FormEvent) { event.preventDefault(); if (registration.password !== registration.confirm) return setError("Las contraseñas no coinciden."); await postAuth({ action: "register", ...registration }); }
-  async function signOut() { await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }); setData(null); setLoginPassword(""); setScreen("login"); }
+  async function signOut() { await fetch("api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }); setData(null); setLoginPassword(""); setScreen("login"); }
   async function enableAlerts() { if ("Notification" in window) await Notification.requestPermission(); }
   useEffect(() => {
     if (screen !== "app") return;
@@ -117,7 +117,7 @@ export default function Home() {
     const reserve = async (input: unknown) => {
       const chargerId = typeof input === "object" && input !== null ? Number((input as { chargerId?: unknown }).chargerId) : NaN;
       if (!Number.isInteger(chargerId)) throw new Error("chargerId debe ser un número entero.");
-      const response = await fetch("/api/charging", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "join", chargerId }) });
+      const response = await fetch("api/charging", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "join", chargerId }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "No fue posible apartar el cargador.");
       setData(body);

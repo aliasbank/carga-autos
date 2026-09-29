@@ -6,6 +6,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM dependencies AS build
+ARG APP_BASE_PATH=""
+ENV APP_BASE_PATH=${APP_BASE_PATH}
 COPY . ./
 RUN npm run build
 
@@ -17,6 +19,7 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     APP_DATA_DIR=/data \
     SITES_RUNTIME_ROOT=/data/runtime \
+    APP_BASE_PATH="" \
     CLOUDFLARE_CF_FETCH_ENABLED=false \
     WRANGLER_SEND_METRICS=false \
     WRANGLER_WRITE_LOGS=false
@@ -44,6 +47,6 @@ VOLUME ["/data"]
 ENTRYPOINT ["/usr/local/bin/node"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD ["/usr/local/bin/node", "-e", "fetch('http://127.0.0.1:8787/api/auth').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+  CMD ["/usr/local/bin/node", "-e", "const base=(process.env.APP_BASE_PATH||'').replace(/\\/+$/, ''); fetch('http://127.0.0.1:8787'+base+'/api/auth').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
 
 CMD ["scripts/docker-entrypoint.mjs"]

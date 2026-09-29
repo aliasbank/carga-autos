@@ -4,7 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Carga en orden",
   description: "Turnos claros para cargar vehículos eléctricos en el trabajo.",
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+  // Relative paths remain inside the configured basePath when Nginx mounts
+  // the app at /cargadores/.
+  icons: { icon: "favicon.svg", shortcut: "favicon.svg" },
 };
 
 export default function RootLayout({

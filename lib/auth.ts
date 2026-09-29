@@ -60,6 +60,12 @@ function cookieValue(request: Request, name: string) {
   return item ? decodeURIComponent(item.slice(name.length + 1)) : null;
 }
 
+function sessionCookiePath() {
+  const configured = (process.env.APP_BASE_PATH || "").trim();
+  if (!configured || configured === "/") return "/";
+  return `/${configured.replace(/^\/+|\/+$/g, "")}`;
+}
+
 function sessionCookie(token: string, request: Request, expired = false) {
   // The application remains bound to loopback behind Nginx in production.
   // Trust the forwarded scheme there so session cookies stay HTTPS-only while
@@ -67,7 +73,7 @@ function sessionCookie(token: string, request: Request, expired = false) {
   const forwardedProto = (request.headers.get("x-forwarded-proto") || "").split(",")[0].trim().toLowerCase();
   const secure = forwardedProto === "https" || new URL(request.url).protocol === "https:" ? "; Secure" : "";
   const expiry = expired ? "; Max-Age=0" : `; Max-Age=${SESSION_SECONDS}`;
-  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict${secure}${expiry}`;
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=${sessionCookiePath()}; HttpOnly; SameSite=Strict${secure}${expiry}`;
 }
 
 export async function currentUser(request: Request): Promise<Principal | null> {

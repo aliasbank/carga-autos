@@ -1,4 +1,11 @@
-const endpoint = String(process.env.QUEUE_AUTOMATION_URL || "http://cargadores:8787/api/queue-automation");
+function normalizedBasePath(value) {
+  const candidate = String(value || "").trim();
+  if (!candidate || candidate === "/") return "";
+  return `/${candidate.replace(/^\/+|\/+$/g, "")}`;
+}
+
+const basePath = normalizedBasePath(process.env.APP_BASE_PATH);
+const endpoint = String(process.env.QUEUE_AUTOMATION_URL || `http://cargadores:8787${basePath}/api/queue-automation`);
 const token = String(process.env.QUEUE_AUTOMATION_TOKEN || "").trim();
 const intervalSeconds = Number(process.env.QUEUE_AUTOMATION_INTERVAL_SECONDS || "30");
 
