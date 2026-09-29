@@ -1,4 +1,4 @@
-import { AuthError, canManageChargers, createLocalAccount, isAdmin, requireUser, resetPassword, type Role } from "@/lib/auth";
+import { AuthError, canManageChargers, canSuperviseQueue, createLocalAccount, isAdmin, requireUser, resetPassword, type Role } from "@/lib/auth";
 import { rebalanceQueue, requeueNoShows } from "@/lib/charging-queue";
 import { getDatabase } from "@/lib/database";
 
@@ -29,12 +29,28 @@ async function dashboard(request: Request) {
       JOIN accounts a ON a.profile_id = p.id
     WHERE q.status IN ('queued','active') ORDER BY q.scheduled_start ASC
   `).all();
+  const blocks = await database.prepare(`
+    SELECT b.id, b.charger_id, b.affected_queue_id, b.reported_by_profile_id, b.reported_at,
+      c.code AS charger_code, c.location,
+      reporter_account.username AS reported_by_username,
+      affected_turn.profile_id AS affected_profile_id,
+      affected_account.username AS affected_username
+    FROM charger_blocks b
+    JOIN chargers c ON c.id = b.charger_id
+    JOIN profiles reporter_profile ON reporter_profile.id = b.reported_by_profile_id
+    JOIN accounts reporter_account ON reporter_account.profile_id = reporter_profile.id
+    LEFT JOIN charging_queue affected_turn ON affected_turn.id = b.affected_queue_id
+    LEFT JOIN profiles affected_profile ON affected_profile.id = affected_turn.profile_id
+    LEFT JOIN accounts affected_account ON affected_account.profile_id = affected_profile.id
+    WHERE b.status = 'open'
+    ORDER BY b.reported_at ASC, b.id ASC
+  `).all();
   const users = isAdmin(profile) ? await database.prepare(`
     SELECT p.id, p.role, p.is_active, p.can_manage_chargers, a.username, a.last_login_at
     FROM profiles p JOIN accounts a ON a.profile_id = p.id ORDER BY p.role DESC, a.username ASC
   `).all() : { results: [] };
   return Response.json({
-    profile: { ...profile, canManageChargers: canManageChargers(profile) }, chargers: chargers.results, queue: queue.results, users: users.results, now: new Date().toISOString(),
+    profile: { ...profile, canManageChargers: canManageChargers(profile) }, chargers: chargers.results, queue: queue.results, blocks: blocks.results, users: users.results, now: new Date().toISOString(),
   });
 }
 
@@ -47,11 +63,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let action = "";
   try {
     const payload = await request.json() as Record<string, unknown>;
     const profile = await requireUser(request);
     const database = getDatabase();
-    const action = String(payload.action || "");
+    action = String(payload.action || "");
     await requeueNoShows(database);
 
     if (action === "profile") {
@@ -76,7 +93,8 @@ export async function POST(request: Request) {
       if (!canManageChargers(profile)) return error("No tienes permiso para administrar cargadores.", 403);
       const chargerId = Number(payload.chargerId);
       const pending = await database.prepare("SELECT id FROM charging_queue WHERE charger_id = ? AND status IN ('active', 'queued')").bind(chargerId).first();
-      if (pending) return error("No puedes retirar un cargador con una sesión activa o una fila pendiente.");
+      const blocked = await database.prepare("SELECT id FROM charger_blocks WHERE charger_id = ? AND status = 'open'").bind(chargerId).first();
+      if (pending || blocked) return error("No puedes retirar un cargador con una sesión, fila o bloqueo pendiente.");
       await database.prepare("UPDATE chargers SET active = 0 WHERE id = ?").bind(chargerId).run();
       return dashboard(request);
     }
@@ -121,10 +139,47 @@ export async function POST(request: Request) {
       return dashboard(request);
     }
 
+    if (action === "report-unregistered-occupancy") {
+      const queueId = Number(payload.queueId);
+      const row = await database.prepare("SELECT charger_id, profile_id, status, scheduled_start FROM charging_queue WHERE id = ?").bind(queueId).first<{ charger_id: number; profile_id: number; status: string; scheduled_start: string }>();
+      if (!row) return error("No encontramos ese turno.", 404);
+      if (row.profile_id !== profile.profileId && !canSuperviseQueue(profile)) return error("Solo la persona con el turno o coordinación puede reportar esta ocupación.", 403);
+      if (row.status !== "queued") return error("Solo se puede reportar una ocupación antes de conectar.");
+      const active = await database.prepare("SELECT id FROM charging_queue WHERE charger_id = ? AND status = 'active'").bind(row.charger_id).first();
+      if (active) return error("El cargador ya tiene una sesión activa registrada.");
+      const head = await database.prepare("SELECT id FROM charging_queue WHERE charger_id = ? AND status = 'queued' ORDER BY scheduled_start ASC, id ASC LIMIT 1").bind(row.charger_id).first<{ id: number }>();
+      if (head?.id !== queueId) return error("Solo la primera persona de la fila puede reportar que el cargador está ocupado.");
+      if (new Date(row.scheduled_start).getTime() > Date.now()) return error("Puedes reportarlo cuando tu turno ya esté disponible.");
+      const existingBlock = await database.prepare("SELECT id FROM charger_blocks WHERE charger_id = ? AND status = 'open'").bind(row.charger_id).first();
+      if (existingBlock) return error("Ya hay un reporte abierto para este cargador.");
+      await database.prepare(`
+        INSERT INTO charger_blocks (charger_id, affected_queue_id, reported_by_profile_id, reported_at, status)
+        VALUES (?, ?, ?, ?, 'open')
+      `).bind(row.charger_id, queueId, profile.profileId, new Date().toISOString()).run();
+      return dashboard(request);
+    }
+
+    if (action === "release-unregistered-occupancy") {
+      if (!canSuperviseQueue(profile)) return error("Solo coordinación o administración puede confirmar que el cargador quedó libre.", 403);
+      const chargerId = Number(payload.chargerId);
+      const block = await database.prepare("SELECT id FROM charger_blocks WHERE charger_id = ? AND status = 'open'").bind(chargerId).first<{ id: number }>();
+      if (!block) return error("No hay una ocupación externa pendiente para este cargador.", 404);
+      const now = new Date().toISOString();
+      await database.prepare(`
+        UPDATE charger_blocks
+        SET status = 'released', released_at = ?, released_by_profile_id = ?
+        WHERE id = ? AND status = 'open'
+      `).bind(now, profile.profileId, block.id).run();
+      // The protected first turn starts its normal ten-minute arrival grace
+      // from this moment, and every later turn is moved forward accordingly.
+      await rebalanceQueue(database, chargerId);
+      return dashboard(request);
+    }
+
     const queueId = Number(payload.queueId);
     const row = await database.prepare("SELECT charger_id, profile_id, status, scheduled_start FROM charging_queue WHERE id = ?").bind(queueId).first<{ charger_id: number; profile_id: number; status: string; scheduled_start: string }>();
     if (!row) return error("No encontramos ese turno.", 404);
-    if (row.profile_id !== profile.profileId && profile.role === "usuario") return error("No puedes modificar el turno de otra persona.", 403);
+    if (row.profile_id !== profile.profileId && !canSuperviseQueue(profile)) return error("No puedes modificar el turno de otra persona.", 403);
     if (action === "start") {
       if (row.status !== "queued") return error("Este turno ya no puede iniciarse.");
       const active = await database.prepare("SELECT id FROM charging_queue WHERE charger_id = ? AND status = 'active'").bind(row.charger_id).first();
@@ -132,7 +187,15 @@ export async function POST(request: Request) {
       const nextTurn = await database.prepare("SELECT id FROM charging_queue WHERE charger_id = ? AND status = 'queued' ORDER BY scheduled_start ASC, id ASC LIMIT 1").bind(row.charger_id).first<{ id: number }>();
       if (nextTurn?.id !== queueId) return error("Aún hay personas antes de este turno en la fila.");
       if (new Date(row.scheduled_start).getTime() > Date.now()) return error("Aún no es el momento de este turno. El margen de transición de 5 minutos debe concluir antes de conectar.");
-      await database.prepare("UPDATE charging_queue SET status = 'active', started_at = ? WHERE id = ?").bind(new Date().toISOString(), queueId).run();
+      const now = new Date().toISOString();
+      await database.prepare("UPDATE charging_queue SET status = 'active', started_at = ? WHERE id = ?").bind(now, queueId).run();
+      // Marking a protected turn as connected is the confirmation that the
+      // unregistered vehicle left. Its two hours start now, not at the report.
+      await database.prepare(`
+        UPDATE charger_blocks
+        SET status = 'released', released_at = ?, released_by_profile_id = ?
+        WHERE charger_id = ? AND status = 'open'
+      `).bind(now, profile.profileId, row.charger_id).run();
       await rebalanceQueue(database, row.charger_id);
     } else if (action === "finish") {
       if (row.status !== "active") return error("Este turno no está activo.");
@@ -146,6 +209,7 @@ export async function POST(request: Request) {
     return dashboard(request);
   } catch (cause) {
     if (cause instanceof AuthError) return error(cause.message, cause.status);
+    if (action === "report-unregistered-occupancy" && cause instanceof Error && cause.message.includes("charger_blocks_one_open_per_charger")) return error("Ya hay un reporte abierto para este cargador.", 409);
     const message = cause instanceof Error && cause.message.includes("UNIQUE") ? "Ese dato ya está registrado." : cause instanceof Error ? cause.message : "No fue posible guardar el cambio.";
     return error(message, 500);
   }

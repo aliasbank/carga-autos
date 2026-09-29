@@ -96,6 +96,11 @@ export function canManageChargers(user: Principal) {
   return user.role === "administrador" || user.canManageChargers;
 }
 
+/** Coordinators can supervise queue incidents without gaining charger setup access. */
+export function canSuperviseQueue(user: Principal) {
+  return user.role === "coordinador" || user.role === "administrador";
+}
+
 export function isAdmin(user: Principal) { return user.role === "administrador"; }
 
 export type NewAccount = {

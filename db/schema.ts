@@ -60,3 +60,17 @@ export const chargingQueue = sqliteTable("charging_queue", {
   index("idx_queue_charger_status_start").on(table.chargerId, table.status, table.scheduledStart),
   index("idx_queue_profile_status").on(table.profileId, table.status),
 ]);
+
+export const chargerBlocks = sqliteTable("charger_blocks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  chargerId: integer("charger_id").notNull().references(() => chargers.id),
+  affectedQueueId: integer("affected_queue_id").references(() => chargingQueue.id),
+  reportedByProfileId: integer("reported_by_profile_id").notNull().references(() => profiles.id),
+  reportedAt: text("reported_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  releasedAt: text("released_at"),
+  releasedByProfileId: integer("released_by_profile_id").references(() => profiles.id),
+  status: text("status", { enum: ["open", "released"] }).notNull().default("open"),
+}, (table) => [
+  index("idx_charger_blocks_charger_status").on(table.chargerId, table.status),
+  index("idx_charger_blocks_queue_status").on(table.affectedQueueId, table.status),
+]);

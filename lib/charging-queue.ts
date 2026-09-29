@@ -29,6 +29,22 @@ export async function rebalanceQueue(database: D1Database, chargerId: number) {
     ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, scheduled_start ASC, id ASC
   `).bind(chargerId).all<QueueEntry>();
 
+  const openBlock = await database.prepare(`
+    SELECT id FROM charger_blocks
+    WHERE charger_id = ? AND status = 'open'
+    LIMIT 1
+  `).bind(chargerId).first<{ id: number }>();
+
+  // A physical vehicle without a registered turn means there is no reliable
+  // availability time. Preserve the existing order until somebody confirms the
+  // charger is free; the queue will be recalculated from that actual moment.
+  if (openBlock) {
+    const tail = entries.results.filter((entry) => entry.status === "queued").at(-1);
+    return tail
+      ? isoPlusMinutes(tail.scheduled_start, tail.duration_minutes + HANDOVER_MINUTES)
+      : new Date().toISOString();
+  }
+
   const lastCompleted = await database.prepare(`
     SELECT ended_at FROM charging_queue
     WHERE charger_id = ? AND status = 'completed' AND ended_at IS NOT NULL
@@ -69,6 +85,10 @@ export async function requeueNoShows(database: D1Database, now = new Date()) {
     FROM charging_queue q
     WHERE q.status = 'queued'
       AND q.scheduled_start <= ?
+      AND NOT EXISTS (
+        SELECT 1 FROM charger_blocks block
+        WHERE block.charger_id = q.charger_id AND block.status = 'open'
+      )
       AND NOT EXISTS (
         SELECT 1 FROM charging_queue active
         WHERE active.charger_id = q.charger_id AND active.status = 'active'

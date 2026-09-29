@@ -64,6 +64,26 @@ La revisión ocurre aun cuando ningún usuario tenga abierta la aplicación. La
 aplicación también revisa esta regla al cargar el tablero o realizar una acción,
 como protección adicional.
 
+## Cargador ocupado sin registro
+
+Si la primera persona de la fila llega y encuentra un vehículo que no tiene un
+turno registrado, puede usar **Reportar ocupado**. El sistema registra la
+incidencia, protege ese turno y pausa la regla de ausencia de 10 minutos para
+ese cargador. Las dos horas no empiezan a consumirse mientras el vehículo ajeno
+sigue conectado.
+
+La alerta aparece en la aplicación para la persona afectada, coordinación y
+administración; si otorgaron permiso de avisos del navegador y tienen la
+aplicación abierta, también reciben un aviso web. El correo no se envía hasta
+que se configure un proveedor de correo.
+
+Cuando el vehículo externo se retira, la persona con el turno puede conectar y
+usar **Ya quedó libre: marcar conectado**. Sus 120 minutos comienzan en ese
+instante y la fila se recalcula con el margen de transición de cinco minutos.
+Coordinación o administración puede usar **Confirmar liberado** si verifica la
+liberación; en ese caso, el turno protegido queda disponible desde ese momento
+y vuelve a aplicar el margen normal de diez minutos para marcar conexión.
+
 ## Datos y migraciones
 
 Al arrancar, el contenedor aplica únicamente las migraciones pendientes antes de abrir el servicio. La base D1 local y el registro de migraciones se guardan en el volumen Docker; por ello, reiniciar o reconstruir el contenedor no borra los datos.

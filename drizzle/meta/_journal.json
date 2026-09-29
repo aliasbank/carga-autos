@@ -29,6 +29,13 @@
       "when": 1790611300000,
       "tag": "0003_profile_vehicle",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790709548046,
+      "tag": "0004_tricky_namorita",
+      "breakpoints": true
     }
   ]
 }
